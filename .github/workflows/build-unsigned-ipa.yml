@@ -17,12 +17,15 @@ jobs:
 
     - name: Build and Archive iOS App
       run: |
-        # Используем официальный инструмент xcodebuild для сборки приложений из Swift-пакетов
+        # Создаем изолированную директорию для зависимостей, чтобы обойти баг сетевого кэша Git
+        mkdir -p .build/cloned_packages
+        
+        # Корректный вызов xcodebuild для Swift пакетов без флага -packagePath
         xcodebuild archive \
-          -packagePath . \
           -scheme LLMTokenSaver \
           -destination 'generic/platform=iOS' \
           -archivePath build/LLMTokenSaver.xcarchive \
+          -clonedSourcePackagesDirPath .build/cloned_packages \
           CODE_SIGNING_ALLOWED=NO \
           CODE_SIGNING_REQUIRED=NO
 
