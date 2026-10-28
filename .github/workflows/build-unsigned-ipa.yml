@@ -15,22 +15,24 @@ jobs:
       env:
         ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
-    - name: Fix SwiftPM Git URL Resolution
+    - name: Purge Broken Package Caches
       run: |
-        # Принудительно подменяем ошибочный коренной URL-адрес на валидный репозиторий библиотеки
-        git config --global url."https://github.com".insteadOf "https://github.com"
+        # Принудительно очищаем все папки кэша, в которых застрял ошибочный коренной URL
+        rm -rf ~/Library/Caches/org.swift.swiftpm
+        rm -rf .build
         
-        # Отключаем системный кэш репозиториев на уровне окружения SwiftPM
-        defaults write com.apple.dt.Xcode IDEPackageSupportUseBuiltInSCM YES
+        # Настраиваем Git на игнорирование сломанных контейнерных ссылок
+        git config --global url."https://github.com".insteadOf "https://github.com"
+        git config --global url."https://github.com".insteadOf "https://github.com/"
 
     - name: Resolve Swift Package Dependencies
       run: |
-        # Теперь вызов пройдет без обращения к сломанному кэшу контейнера
+        # Чистый запуск разрешения зависимостей
         swift package resolve
 
     - name: Build and Archive iOS App
       run: |
-        # Компилируем исполняемый файл приложения графического интерфейса
+        # Собираем приложение из уже очищенного локального графа зависимостей
         xcodebuild archive \
           -scheme LLMTokenSaver \
           -destination 'generic/platform=iOS' \
@@ -49,7 +51,6 @@ jobs:
           echo "Приложение успешно извлечено из архива."
           cp -R "$APP_PATH" build/Payload/
         else
-          # Фолбэк на случай альтернативной структуры папок xcodebuild
           FOUND_APP=$(find build/LLMTokenSaver.xcarchive -type d -name "*.app" | head -n 1)
           if [ -n "$FOUND_APP" ]; then
             cp -R "$FOUND_APP" build/Payload/
