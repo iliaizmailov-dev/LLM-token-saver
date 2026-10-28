@@ -11,7 +11,7 @@ let package = Package(
     ],
     dependencies: [
         // Подключаем официальную библиотеку MacPaw OpenAI
-        .package(url: "https://github.com", from: "0.2.7")
+        .package(url: "https://github.com/MacPaw/OpenAI.git", from: "0.2.7")
     ],
     targets: [
         .target(
