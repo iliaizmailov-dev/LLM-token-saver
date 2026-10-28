@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-15 # Переключаемся на систему с предустановленным Swift 6.0
 
     steps:
     - name: Checkout Code
@@ -17,7 +17,7 @@ jobs:
 
     - name: Build Swift Package App Backend
       run: |
-        # Указываем SwiftPM путь к официальному iOS SDK, который предустановлен на macOS-14
+        # Указываем SwiftPM путь к официальному iOS SDK
         swift build -c release --triple arm64-apple-ios18.0 --sdk $(xcrun --sdk iphoneos --show-sdk-path)
 
     - name: Pack Unsigned .app into IPA Structure
