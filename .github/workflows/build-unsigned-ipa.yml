@@ -7,37 +7,34 @@ on:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-15 # Используем удаленный Mac с предустановленным Swift 6.0
 
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
-      with:
-        clone-inputs: false
       env:
         ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
     - name: Build Swift Package App Backend
       run: |
-        # Добавляем флаг отключения кэша репозиториев, чтобы обойти ошибку клонирования в контейнере
+        # Собираем проект под официальный iOS SDK без лишних флагов кэширования
         swift build -c release \
           --triple arm64-apple-ios18.0 \
-          --sdk $(xcrun --sdk iphoneos --show-sdk-path) \
-          --disable-repository-cache
+          --sdk $(xcrun --sdk iphoneos --show-sdk-path)
 
     - name: Pack Unsigned .app into IPA Structure
       run: |
         mkdir -p build/Payload
         mkdir -p build/Payload/LLMTokenSaver.app
         
-        # Переносим скомпилированный бинарный файл
+        # Переносим скомпилированный исполняемый файл
         if [ -f .build/arm64-apple-ios18.0/release/LLMTokenSaver ]; then
           cp .build/arm64-apple-ios18.0/release/LLMTokenSaver build/Payload/LLMTokenSaver.app/LLMTokenSaver
         else
           cp .build/release/LLMTokenSaver build/Payload/LLMTokenSaver.app/LLMTokenSaver
         fi
         
-        # Создаем Info.plist конфигурацию
+        # Создаем Info.plist конфигурацию, чтобы SideStore распознал приложение
         echo '<?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com">
         <plist version="1.0">
@@ -59,7 +56,7 @@ jobs:
         </dict>
         </plist>' > build/Payload/LLMTokenSaver.app/Info.plist
 
-        # Упаковываем в IPA
+        # Упаковываем структуру Payload в .ipa архив
         cd build
         zip -r LLMTokenSaver-unsigned.ipa Payload
         
