@@ -42,7 +42,7 @@ class ChatEngine: ObservableObject {
             ChatQuery.ChatCompletionMessageParam(role: msg.isUser ? .user : .assistant, content: msg.englishContextText)!
         }
         
-        let query = ChatQuery(messages: openAIMessages, model: .gpt4o)
+        let query = ChatQuery(messages: openAIMessages, model: "gpt-4o")
         
         do {
             // 3. Сетевой запрос к LLM
