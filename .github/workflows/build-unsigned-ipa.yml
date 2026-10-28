@@ -7,19 +7,18 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14 # На удаленном Mac от GitHub уже предустановлен актуальный Xcode
+    runs-on: macos-14
 
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
       env:
-        # Подавляем предупреждение о переходе на Node 24 для старых экшенов
         ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
     - name: Build Swift Package App Backend
       run: |
-        # Компилируем исполняемый файл напрямую через SwiftPM без явного вызова setup-xcode
-        swift build -c release --triple arm64-apple-ios18.0
+        # Указываем SwiftPM путь к официальному iOS SDK, который предустановлен на macOS-14
+        swift build -c release --triple arm64-apple-ios18.0 --sdk $(xcrun --sdk iphoneos --show-sdk-path)
 
     - name: Pack Unsigned .app into IPA Structure
       run: |
