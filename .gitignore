@@ -1,1 +1,27 @@
+# Xcode
+#
+build/
+DerivedData/
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcodeproj/project.xcworkspace
+*.xcworkspace/*
+!*.xcworkspace/contents.xcworkspace
+*.xcuserstate
+*.xcuserdatad
+
+# Swift Package Manager
+#
+.build/
+Packages/
+Package.pins
+Package.resolved
+.swiftpm/
+
+# macOS system files
+#
+.DS_Store
+.AppleDouble
+.LSOverride
 
