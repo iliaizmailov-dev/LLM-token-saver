@@ -4,17 +4,18 @@ import PackageDescription
 let package = Package(
     name: "LLMTokenSaver",
     platforms: [
-        .iOS(.v18) // Конфигурация под современную iOS
+        .iOS(.v18)
     ],
     products: [
-        .library(name: "LLMTokenSaver", targets: ["LLMTokenSaver"]),
+        // Меняем тип продукта на исполняемое приложение (executable)
+        .executable(name: "LLMTokenSaver", targets: ["LLMTokenSaver"])
     ],
     dependencies: [
-        // Подключаем официальную библиотеку MacPaw OpenAI
-        .package(url: "https://github.com/MacPaw/OpenAI.git", from: "0.2.7")
+        .package(url: "https://github.com", from: "0.2.7")
     ],
     targets: [
-        .target(
+        // Указываем тип таргета как исполняемый (executableTarget)
+        .executableTarget(
             name: "LLMTokenSaver",
             dependencies: ["OpenAI"]
         )
