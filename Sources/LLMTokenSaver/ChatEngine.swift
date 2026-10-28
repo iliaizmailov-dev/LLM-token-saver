@@ -1,5 +1,5 @@
 import Foundation
-import OpenAI // Сторонняя библиотека, которую мы подключим ниже
+import OpenAI
 
 @MainActor
 class ChatEngine: ObservableObject {
@@ -37,7 +37,7 @@ class ChatEngine: ObservableObject {
             threads[threadIndex].title = String(rawUserPrompt.prefix(20)) + "..."
         }
         
-        // 2. Формирование истории сообщений строго на английском для сохранения токенов
+        // 2. Формирование истории сообщений строго на английском (Совместимо с OpenAI SDK 0.6.0)
         let openAIMessages = threads[threadIndex].messages.map { msg in
             ChatQuery.ChatCompletionMessageParam(role: msg.isUser ? .user : .assistant, content: msg.englishContextText)!
         }
@@ -47,7 +47,8 @@ class ChatEngine: ObservableObject {
         do {
             // 3. Сетевой запрос к LLM
             let result = try await client.chats(query: query)
-            guard let aiResponseEN = result.choices.first?.message.content?.string else { return }
+            // Прямо извлекаем опциональную строку ответа, убирая ломающий вызов .string
+            guard let aiResponseEN = result.choices.first?.message.content else { return }
             
             // 4. Обратный локальный перевод ответа на русский с защитой кода
             let payloadRU = MarkdownParser.prepareForTranslation(aiResponseEN)
