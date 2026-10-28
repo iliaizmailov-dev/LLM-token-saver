@@ -15,52 +15,63 @@ jobs:
       env:
         ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
-    - name: Build Swift Package App Backend
+    - name: Build and Archive iOS App
       run: |
-        swift build -c release \
-          --triple arm64-apple-ios18.0 \
-          --sdk $(xcrun --sdk iphoneos --show-sdk-path)
+        # Используем официальный инструмент xcodebuild для сборки приложений из Swift-пакетов
+        xcodebuild archive \
+          -packagePath . \
+          -scheme LLMTokenSaver \
+          -destination 'generic/platform=iOS' \
+          -archivePath build/LLMTokenSaver.xcarchive \
+          CODE_SIGNING_ALLOWED=NO \
+          CODE_SIGNING_REQUIRED=NO
 
     - name: Pack Unsigned .app into IPA Structure
       run: |
         mkdir -p build/Payload
-        mkdir -p build/Payload/LLMTokenSaver.app
         
-        # Умный поиск скомпилированного бинарного файла в недрах папки .build
-        echo "Ищем скомпилированный файл..."
-        BINARY_PATH=$(find .build -type f -name "LLMTokenSaver" -not -path "*/plugins/*" | head -n 1)
+        # Извлекаем скомпилированное приложение прямо из созданного Apple архива
+        APP_PATH="build/LLMTokenSaver.xcarchive/Products/Applications/LLMTokenSaver.app"
         
-        if [ -n "$BINARY_PATH" ]; then
-          echo "Файл найден по пути: $BINARY_PATH"
-          cp "$BINARY_PATH" build/Payload/LLMTokenSaver.app/LLMTokenSaver
+        if [ -d "$APP_PATH" ]; then
+          echo "Приложение успешно извлечено из архива."
+          cp -R "$APP_PATH" build/Payload/
         else
-          echo "Критическая ошибка: бинарный файл не найден!"
-          exit 1
+          # Фолбэк на случай альтернативной структуры папок xcodebuild
+          FOUND_APP=$(find build/LLMTokenSaver.xcarchive -type d -name "*.app" | head -n 1)
+          if [ -n "$FOUND_APP" ]; then
+            cp -R "$FOUND_APP" build/Payload/
+          else
+            echo "Критическая ошибка: Скомпилированный .app контейнер не найден в архиве!"
+            exit 1
+          fi
         fi
         
-        # Создаем Info.plist конфигурацию
-        echo '<?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com">
-        <plist version="1.0">
-        <dict>
-            <key>CFBundleExecutable</key>
-            <string>LLMTokenSaver</string>
-            <key>CFBundleIdentifier</key>
-            <string>com.tokensaver.llmtokensaver</string>
-            <key>CFBundleName</key>
-            <string>LLMTokenSaver</string>
-            <key>CFBundleShortVersionString</key>
-            <string>1.0</string>
-            <key>CFBundleVersion</key>
-            <string>1</string>
-            <key>LSRequiresIPhoneOS</key>
-            <true/>
-            <key>MinimumOSVersion</key>
-            <string>18.0</string>
-        </dict>
-        </plist>' > build/Payload/LLMTokenSaver.app/Info.plist
+        # Создаем Info.plist конфигурацию (если xcodebuild не создал её автоматически)
+        if [ ! -f build/Payload/LLMTokenSaver.app/Info.plist ]; then
+          echo '<?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleExecutable</key>
+              <string>LLMTokenSaver</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.tokensaver.llmtokensaver</string>
+              <key>CFBundleName</key>
+              <string>LLMTokenSaver</string>
+              <key>CFBundleShortVersionString</key>
+              <string>1.0</string>
+              <key>CFBundleVersion</key>
+              <string>1</string>
+              <key>LSRequiresIPhoneOS</key>
+              <true/>
+              <key>MinimumOSVersion</key>
+              <string>18.0</string>
+          </dict>
+          </plist>' > build/Payload/LLMTokenSaver.app/Info.plist
+        fi
 
-        # Упаковываем в IPA
+        # Упаковываем структуру Payload в .ipa архив
         cd build
         zip -r LLMTokenSaver-unsigned.ipa Payload
         
