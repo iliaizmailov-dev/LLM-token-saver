@@ -15,14 +15,22 @@ jobs:
       env:
         ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
+    - name: Fix SwiftPM Git URL Resolution
+      run: |
+        # Принудительно подменяем ошибочный коренной URL-адрес на валидный репозиторий библиотеки
+        git config --global url."https://github.com".insteadOf "https://github.com"
+        
+        # Отключаем системный кэш репозиториев на уровне окружения SwiftPM
+        defaults write com.apple.dt.Xcode IDEPackageSupportUseBuiltInSCM YES
+
     - name: Resolve Swift Package Dependencies
       run: |
-        # Принудительно выкачиваем зависимости в стандартном режиме SwiftPM, минуя баг xcodebuild
+        # Теперь вызов пройдет без обращения к сломанному кэшу контейнера
         swift package resolve
 
     - name: Build and Archive iOS App
       run: |
-        # Собираем приложение из уже готового локального графа зависимостей
+        # Компилируем исполняемый файл приложения графического интерфейса
         xcodebuild archive \
           -scheme LLMTokenSaver \
           -destination 'generic/platform=iOS' \
