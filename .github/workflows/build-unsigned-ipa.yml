@@ -7,18 +7,23 @@ on:
 
 jobs:
   build:
-    runs-on: macos-15 # Переключаемся на систему с предустановленным Swift 6.0
+    runs-on: macos-15
 
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
+      with:
+        clone-inputs: false
       env:
         ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
     - name: Build Swift Package App Backend
       run: |
-        # Указываем SwiftPM путь к официальному iOS SDK
-        swift build -c release --triple arm64-apple-ios18.0 --sdk $(xcrun --sdk iphoneos --show-sdk-path)
+        # Добавляем флаг отключения кэша репозиториев, чтобы обойти ошибку клонирования в контейнере
+        swift build -c release \
+          --triple arm64-apple-ios18.0 \
+          --sdk $(xcrun --sdk iphoneos --show-sdk-path) \
+          --disable-repository-cache
 
     - name: Pack Unsigned .app into IPA Structure
       run: |
