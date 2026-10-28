@@ -15,24 +15,20 @@ jobs:
       env:
         ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
-    - name: Purge Broken Package Caches
+    - name: Clean Environment
       run: |
-        # Принудительно очищаем все папки кэша, в которых застрял ошибочный коренной URL
-        rm -rf ~/Library/Caches/org.swift.swiftpm
+        # Полностью вычищаем временные контейнеры сборщика перед стартом
         rm -rf .build
-        
-        # Настраиваем Git на игнорирование сломанных контейнерных ссылок
-        git config --global url."https://github.com".insteadOf "https://github.com"
-        git config --global url."https://github.com".insteadOf "https://github.com/"
+        rm -rf build
 
     - name: Resolve Swift Package Dependencies
       run: |
-        # Чистый запуск разрешения зависимостей
+        # Прямой запуск загрузки пакетов по обновленному манифесту
         swift package resolve
 
     - name: Build and Archive iOS App
       run: |
-        # Собираем приложение из уже очищенного локального графа зависимостей
+        # Компилируем исполняемый файл приложения
         xcodebuild archive \
           -scheme LLMTokenSaver \
           -destination 'generic/platform=iOS' \
@@ -44,7 +40,6 @@ jobs:
       run: |
         mkdir -p build/Payload
         
-        # Извлекаем скомпилированное приложение прямо из созданного Apple архива
         APP_PATH="build/LLMTokenSaver.xcarchive/Products/Applications/LLMTokenSaver.app"
         
         if [ -d "$APP_PATH" ]; then
@@ -60,31 +55,6 @@ jobs:
           fi
         fi
         
-        # Создаем Info.plist конфигурацию (если xcodebuild не создал её автоматически)
-        if [ ! -f build/Payload/LLMTokenSaver.app/Info.plist ]; then
-          echo '<?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com">
-          <plist version="1.0">
-          <dict>
-              <key>CFBundleExecutable</key>
-              <string>LLMTokenSaver</string>
-              <key>CFBundleIdentifier</key>
-              <string>com.tokensaver.llmtokensaver</string>
-              <key>CFBundleName</key>
-              <string>LLMTokenSaver</string>
-              <key>CFBundleShortVersionString</key>
-              <string>1.0</string>
-              <key>CFBundleVersion</key>
-              <string>1</string>
-              <key>LSRequiresIPhoneOS</key>
-              <true/>
-              <key>MinimumOSVersion</key>
-              <string>18.0</string>
-          </dict>
-          </plist>' > build/Payload/LLMTokenSaver.app/Info.plist
-        fi
-
-        # Упаковываем структуру Payload в .ipa архив
         cd build
         zip -r LLMTokenSaver-unsigned.ipa Payload
         
