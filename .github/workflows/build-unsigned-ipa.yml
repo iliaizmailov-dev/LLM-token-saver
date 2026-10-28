@@ -7,40 +7,33 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14 # Используем облачный Mac для сборки Swift-кода
+    runs-on: macos-14 # На удаленном Mac от GitHub уже предустановлен актуальный Xcode
 
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
-
-    - name: Set up Xcode Version
-      uses: maxim-lobanov/setup-xcode@v1
-      with:
-        xcode-version: '16.0' # Актуальный компилятор для сборки под iOS 18+
+      env:
+        # Подавляем предупреждение о переходе на Node 24 для старых экшенов
+        ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
     - name: Build Swift Package App Backend
       run: |
-        # Собираем наш исполняемый модуль с отключенной подписью
+        # Компилируем исполняемый файл напрямую через SwiftPM без явного вызова setup-xcode
         swift build -c release --triple arm64-apple-ios18.0
 
     - name: Pack Unsigned .app into IPA Structure
       run: |
-        # SideStore требует строго определенную структуру папок (Payload/) внутри .ipa файла
         mkdir -p build/Payload
-        
-        # Находим скомпилированное приложение и копируем его в структуру для экспорта
-        # (Так как у нас чистый SPM-пакет, собираем структуру заглушки приложения)
         mkdir -p build/Payload/LLMTokenSaver.app
         
-        # Копируем бинарный файл из папки сборки SwiftPM в приложение
+        # Переносим скомпилированный бинарный файл
         if [ -f .build/arm64-apple-ios18.0/release/LLMTokenSaver ]; then
           cp .build/arm64-apple-ios18.0/release/LLMTokenSaver build/Payload/LLMTokenSaver.app/LLMTokenSaver
         else
-          # Фолбэк на случай дефолтной структуры папок компилятора
           cp .build/release/LLMTokenSaver build/Payload/LLMTokenSaver.app/LLMTokenSaver
         fi
         
-        # Создаем минимальный файл конфигурации Info.plist, чтобы SideStore понял структуру
+        # Создаем Info.plist конфигурацию
         echo '<?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com">
         <plist version="1.0">
@@ -62,7 +55,7 @@ jobs:
         </dict>
         </plist>' > build/Payload/LLMTokenSaver.app/Info.plist
 
-        # Упаковываем структуру Payload в файл .ipa (архивируем без сжатия метаданных)
+        # Упаковываем в IPA
         cd build
         zip -r LLMTokenSaver-unsigned.ipa Payload
         
@@ -71,4 +64,4 @@ jobs:
       with:
         name: LLMTokenSaver-SideStore-Ready
         path: build/LLMTokenSaver-unsigned.ipa
-        retention-days: 7 # Файл будет храниться на гитхабе неделю
+        retention-days: 7
