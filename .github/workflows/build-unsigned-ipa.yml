@@ -15,17 +15,18 @@ jobs:
       env:
         ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
+    - name: Resolve Swift Package Dependencies
+      run: |
+        # Принудительно выкачиваем зависимости в стандартном режиме SwiftPM, минуя баг xcodebuild
+        swift package resolve
+
     - name: Build and Archive iOS App
       run: |
-        # Создаем изолированную директорию для зависимостей, чтобы обойти баг сетевого кэша Git
-        mkdir -p .build/cloned_packages
-        
-        # Корректный вызов xcodebuild для Swift пакетов без флага -packagePath
+        # Собираем приложение из уже готового локального графа зависимостей
         xcodebuild archive \
           -scheme LLMTokenSaver \
           -destination 'generic/platform=iOS' \
           -archivePath build/LLMTokenSaver.xcarchive \
-          -clonedSourcePackagesDirPath .build/cloned_packages \
           CODE_SIGNING_ALLOWED=NO \
           CODE_SIGNING_REQUIRED=NO
 
