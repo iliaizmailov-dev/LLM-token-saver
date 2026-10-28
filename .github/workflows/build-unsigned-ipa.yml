@@ -1,0 +1,74 @@
+name: Build Unsigned IPA for SideStore
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: # Позволяет запускать сборку вручную одной кнопкой
+
+jobs:
+  build:
+    runs-on: macos-14 # Используем облачный Mac для сборки Swift-кода
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Xcode Version
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: '16.0' # Актуальный компилятор для сборки под iOS 18+
+
+    - name: Build Swift Package App Backend
+      run: |
+        # Собираем наш исполняемый модуль с отключенной подписью
+        swift build -c release --triple arm64-apple-ios18.0
+
+    - name: Pack Unsigned .app into IPA Structure
+      run: |
+        # SideStore требует строго определенную структуру папок (Payload/) внутри .ipa файла
+        mkdir -p build/Payload
+        
+        # Находим скомпилированное приложение и копируем его в структуру для экспорта
+        # (Так как у нас чистый SPM-пакет, собираем структуру заглушки приложения)
+        mkdir -p build/Payload/LLMTokenSaver.app
+        
+        # Копируем бинарный файл из папки сборки SwiftPM в приложение
+        if [ -f .build/arm64-apple-ios18.0/release/LLMTokenSaver ]; then
+          cp .build/arm64-apple-ios18.0/release/LLMTokenSaver build/Payload/LLMTokenSaver.app/LLMTokenSaver
+        else
+          # Фолбэк на случай дефолтной структуры папок компилятора
+          cp .build/release/LLMTokenSaver build/Payload/LLMTokenSaver.app/LLMTokenSaver
+        fi
+        
+        # Создаем минимальный файл конфигурации Info.plist, чтобы SideStore понял структуру
+        echo '<?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com">
+        <plist version="1.0">
+        <dict>
+            <key>CFBundleExecutable</key>
+            <string>LLMTokenSaver</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.tokensaver.llmtokensaver</string>
+            <key>CFBundleName</key>
+            <string>LLMTokenSaver</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.0</string>
+            <key>CFBundleVersion</key>
+            <string>1</string>
+            <key>LSRequiresIPhoneOS</key>
+            <true/>
+            <key>MinimumOSVersion</key>
+            <string>18.0</string>
+        </dict>
+        </plist>' > build/Payload/LLMTokenSaver.app/Info.plist
+
+        # Упаковываем структуру Payload в файл .ipa (архивируем без сжатия метаданных)
+        cd build
+        zip -r LLMTokenSaver-unsigned.ipa Payload
+        
+    - name: Upload Unsigned IPA to GitHub Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: LLMTokenSaver-SideStore-Ready
+        path: build/LLMTokenSaver-unsigned.ipa
+        retention-days: 7 # Файл будет храниться на гитхабе неделю
