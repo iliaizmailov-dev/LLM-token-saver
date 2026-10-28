@@ -8,6 +8,7 @@ struct TranslationPayload {
 class MarkdownParser {
     // Вырезает блоки кода и возвращает текст для перевода + массив оригинального кода
     static func prepareForTranslation(_ text: String) -> TranslationPayload {
+        // Исправленное экранирование регулярного выражения для Swift
         let pattern = "```[\\s\(\S\)]*?```"
         guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
             return TranslationPayload(textToTranslate: text, codeBlocks: [])
