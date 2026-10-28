@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-15 # Используем удаленный Mac с предустановленным Swift 6.0
+    runs-on: macos-15
 
     steps:
     - name: Checkout Code
@@ -17,7 +17,6 @@ jobs:
 
     - name: Build Swift Package App Backend
       run: |
-        # Собираем проект под официальный iOS SDK без лишних флагов кэширования
         swift build -c release \
           --triple arm64-apple-ios18.0 \
           --sdk $(xcrun --sdk iphoneos --show-sdk-path)
@@ -27,14 +26,19 @@ jobs:
         mkdir -p build/Payload
         mkdir -p build/Payload/LLMTokenSaver.app
         
-        # Переносим скомпилированный исполняемый файл
-        if [ -f .build/arm64-apple-ios18.0/release/LLMTokenSaver ]; then
-          cp .build/arm64-apple-ios18.0/release/LLMTokenSaver build/Payload/LLMTokenSaver.app/LLMTokenSaver
+        # Умный поиск скомпилированного бинарного файла в недрах папки .build
+        echo "Ищем скомпилированный файл..."
+        BINARY_PATH=$(find .build -type f -name "LLMTokenSaver" -not -path "*/plugins/*" | head -n 1)
+        
+        if [ -n "$BINARY_PATH" ]; then
+          echo "Файл найден по пути: $BINARY_PATH"
+          cp "$BINARY_PATH" build/Payload/LLMTokenSaver.app/LLMTokenSaver
         else
-          cp .build/release/LLMTokenSaver build/Payload/LLMTokenSaver.app/LLMTokenSaver
+          echo "Критическая ошибка: бинарный файл не найден!"
+          exit 1
         fi
         
-        # Создаем Info.plist конфигурацию, чтобы SideStore распознал приложение
+        # Создаем Info.plist конфигурацию
         echo '<?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com">
         <plist version="1.0">
@@ -56,7 +60,7 @@ jobs:
         </dict>
         </plist>' > build/Payload/LLMTokenSaver.app/Info.plist
 
-        # Упаковываем структуру Payload в .ipa архив
+        # Упаковываем в IPA
         cd build
         zip -r LLMTokenSaver-unsigned.ipa Payload
         
