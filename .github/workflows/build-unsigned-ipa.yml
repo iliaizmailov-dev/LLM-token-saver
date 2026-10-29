@@ -1,66 +1,385 @@
 name: Build Unsigned IPA for SideStore
 
 on:
+  workflow_dispatch:
+
   push:
-    branches: [ "main" ]
-  workflow_dispatch: # Позволяет запускать сборку вручную одной кнопкой
+    branches:
+      - main
 
 jobs:
   build:
+    name: Build LLM Token Saver
     runs-on: macos-15
 
+    timeout-minutes: 30
+
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
-      env:
-        ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
-    - name: Clean Environment
-      run: |
-        # Полностью вычищаем временные контейнеры сборщика перед стартом
-        rm -rf .build
-        rm -rf build
+      # ---------------------------------------------------------
+      # 1. Checkout
+      # ---------------------------------------------------------
 
-    - name: Resolve Swift Package Dependencies
-      run: |
-        # Прямой запуск загрузки пакетов по обновленному манифесту
-        swift package resolve
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Build and Archive iOS App
-      run: |
-        # Компилируем исполняемый файл приложения
-        xcodebuild archive \
-          -scheme LLMTokenSaver \
-          -destination 'generic/platform=iOS' \
-          -archivePath build/LLMTokenSaver.xcarchive \
-          CODE_SIGNING_ALLOWED=NO \
-          CODE_SIGNING_REQUIRED=NO
 
-    - name: Pack Unsigned .app into IPA Structure
-      run: |
-        mkdir -p build/Payload
-        
-        APP_PATH="build/LLMTokenSaver.xcarchive/Products/Applications/LLMTokenSaver.app"
-        
-        if [ -d "$APP_PATH" ]; then
-          echo "Приложение успешно извлечено из архива."
-          cp -R "$APP_PATH" build/Payload/
-        else
-          FOUND_APP=$(find build/LLMTokenSaver.xcarchive -type d -name "*.app" | head -n 1)
-          if [ -n "$FOUND_APP" ]; then
-            cp -R "$FOUND_APP" build/Payload/
+      # ---------------------------------------------------------
+      # 2. Environment information
+      # ---------------------------------------------------------
+
+      - name: Show build environment
+        run: |
+          echo "macOS:"
+          sw_vers
+
+          echo ""
+          echo "Xcode:"
+          xcodebuild -version
+
+          echo ""
+          echo "Swift:"
+          swift --version
+
+
+      # ---------------------------------------------------------
+      # 3. Validate repository structure
+      # ---------------------------------------------------------
+
+      - name: Validate source files
+        run: |
+          set -e
+
+          echo "Checking repository structure..."
+
+          REQUIRED_FILES=(
+            "Sources/LLMTokenSaver/App.swift"
+            "Sources/LLMTokenSaver/ContentView.swift"
+            "Sources/LLMTokenSaver/ChatEngine.swift"
+            "Sources/LLMTokenSaver/ChatModels.swift"
+            "Sources/LLMTokenSaver/MarkdownParser.swift"
+            "Sources/LLMTokenSaver/OpenAIService.swift"
+            "Sources/LLMTokenSaver/TranslationService.swift"
+            "Sources/LLMTokenSaver/KeychainService.swift"
+          )
+
+          for FILE in "${REQUIRED_FILES[@]}"
+          do
+            if [ ! -f "$FILE" ]; then
+              echo "ERROR: Missing file: $FILE"
+              exit 1
+            fi
+
+            echo "OK: $FILE"
+          done
+
+          echo ""
+          echo "All required Swift source files are present."
+
+
+      # ---------------------------------------------------------
+      # 4. Install XcodeGen
+      # ---------------------------------------------------------
+
+      - name: Install XcodeGen
+        run: |
+          set -e
+
+          if command -v xcodegen >/dev/null 2>&1
+          then
+            echo "XcodeGen is already installed."
+            xcodegen --version
           else
-            echo "Критическая ошибка: Скомпилированный .app контейнер не найден в архиве!"
+            echo "Installing XcodeGen..."
+            brew install xcodegen
+            xcodegen --version
+          fi
+
+
+      # ---------------------------------------------------------
+      # 5. Generate temporary XcodeGen specification
+      # ---------------------------------------------------------
+
+      - name: Create XcodeGen project specification
+        run: |
+          cat > project.yml <<'YAML'
+          name: LLMTokenSaver
+
+          options:
+            createIntermediateGroups: true
+            deploymentTarget:
+              iOS: "18.0"
+
+          targets:
+
+            LLMTokenSaver:
+              type: application
+              platform: iOS
+              deploymentTarget: "18.0"
+
+              sources:
+                - path: Sources/LLMTokenSaver
+
+              settings:
+
+                base:
+
+                  PRODUCT_BUNDLE_IDENTIFIER: com.iliaizmailov.LLMTokenSaver
+
+                  PRODUCT_NAME: LLMTokenSaver
+
+                  MARKETING_VERSION: "1.0"
+
+                  CURRENT_PROJECT_VERSION: "1"
+
+                  SWIFT_VERSION: "6.0"
+
+                  IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+
+                  TARGETED_DEVICE_FAMILY: "1"
+
+                  SUPPORTS_MACCATALYST: NO
+
+                  SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+
+                  CODE_SIGNING_ALLOWED: NO
+
+                  CODE_SIGNING_REQUIRED: NO
+
+                  CODE_SIGN_IDENTITY: ""
+
+                  GENERATE_INFOPLIST_FILE: YES
+
+                  INFOPLIST_KEY_CFBundleDisplayName: "LLM Token Saver"
+
+                  INFOPLIST_KEY_LSRequiresIPhoneOS: YES
+
+                  INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+
+                  INFOPLIST_KEY_UILaunchScreen_Generation: YES
+
+                  INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
+
+                  ENABLE_PREVIEWS: NO
+
+                  SWIFT_EMIT_LOC_STRINGS: YES
+
+          schemes:
+
+            LLMTokenSaver:
+
+              build:
+                targets:
+                  LLMTokenSaver: all
+
+              run:
+                config: Debug
+
+              archive:
+                config: Release
+          YAML
+
+          echo "Generated project.yml:"
+          cat project.yml
+
+
+      # ---------------------------------------------------------
+      # 6. Generate the Xcode project
+      # ---------------------------------------------------------
+
+      - name: Generate Xcode project
+        run: |
+          set -e
+
+          xcodegen generate
+
+          echo ""
+          echo "Generated project:"
+          ls -la
+
+          if [ ! -d "LLMTokenSaver.xcodeproj" ]; then
+            echo "ERROR: LLMTokenSaver.xcodeproj was not generated."
             exit 1
           fi
-        fi
-        
-        cd build
-        zip -r LLMTokenSaver-unsigned.ipa Payload
-        
-    - name: Upload Unsigned IPA to GitHub Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: LLMTokenSaver-SideStore-Ready
-        path: build/LLMTokenSaver-unsigned.ipa
-        retention-days: 7
+
+
+      # ---------------------------------------------------------
+      # 7. Show schemes
+      # ---------------------------------------------------------
+
+      - name: Show Xcode project information
+        run: |
+          xcodebuild \
+            -project LLMTokenSaver.xcodeproj \
+            -list
+
+
+      # ---------------------------------------------------------
+      # 8. Clean previous build
+      # ---------------------------------------------------------
+
+      - name: Clean build directory
+        run: |
+          rm -rf build
+
+          mkdir -p build
+
+
+      # ---------------------------------------------------------
+      # 9. Build unsigned iPhone application
+      # ---------------------------------------------------------
+
+      - name: Build unsigned iOS app
+        run: |
+          set -o pipefail
+
+          xcodebuild \
+            -project LLMTokenSaver.xcodeproj \
+            -scheme LLMTokenSaver \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            clean build
+
+
+      # ---------------------------------------------------------
+      # 10. Locate generated .app
+      # ---------------------------------------------------------
+
+      - name: Locate generated application
+        run: |
+          set -e
+
+          APP_PATH="build/DerivedData/Build/Products/Release-iphoneos/LLMTokenSaver.app"
+
+          echo "Expected application:"
+          echo "$APP_PATH"
+
+          if [ ! -d "$APP_PATH" ]; then
+
+            echo ""
+            echo "Application was not found at expected path."
+            echo "Searching build directory..."
+
+            FOUND_APP=$(find build/DerivedData \
+              -type d \
+              -name "LLMTokenSaver.app" \
+              | head -n 1)
+
+            if [ -z "$FOUND_APP" ]; then
+              echo "ERROR: LLMTokenSaver.app was not produced."
+              exit 1
+            fi
+
+            APP_PATH="$FOUND_APP"
+          fi
+
+          echo ""
+          echo "Application found:"
+          echo "$APP_PATH"
+
+          echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
+
+
+      # ---------------------------------------------------------
+      # 11. Inspect generated application
+      # ---------------------------------------------------------
+
+      - name: Inspect application bundle
+        run: |
+          set -e
+
+          echo "Application bundle:"
+          ls -la "$APP_PATH"
+
+          echo ""
+          echo "Info.plist:"
+
+          plutil -p \
+            "$APP_PATH/Info.plist"
+
+
+      # ---------------------------------------------------------
+      # 12. Create Payload directory
+      # ---------------------------------------------------------
+
+      - name: Create IPA Payload
+        run: |
+          set -e
+
+          rm -rf build/Payload
+
+          mkdir -p build/Payload
+
+          cp -R \
+            "$APP_PATH" \
+            build/Payload/LLMTokenSaver.app
+
+          echo "Payload contents:"
+
+          find build/Payload \
+            -maxdepth 2 \
+            -print
+
+
+      # ---------------------------------------------------------
+      # 13. Package unsigned IPA
+      # ---------------------------------------------------------
+
+      - name: Package unsigned IPA
+        run: |
+          set -e
+
+          cd build
+
+          rm -f LLMTokenSaver-unsigned.ipa
+
+          /usr/bin/zip \
+            -qry \
+            LLMTokenSaver-unsigned.ipa \
+            Payload
+
+          echo ""
+          echo "IPA created:"
+
+          ls -lh \
+            LLMTokenSaver-unsigned.ipa
+
+
+      # ---------------------------------------------------------
+      # 14. Verify IPA structure
+      # ---------------------------------------------------------
+
+      - name: Verify IPA structure
+        run: |
+          set -e
+
+          echo "Checking IPA contents..."
+
+          unzip -l \
+            build/LLMTokenSaver-unsigned.ipa
+
+          unzip -l \
+            build/LLMTokenSaver-unsigned.ipa \
+            | grep \
+            "Payload/LLMTokenSaver.app/Info.plist"
+
+          echo ""
+          echo "IPA structure looks valid."
+
+
+      # ---------------------------------------------------------
+      # 15. Upload resulting IPA
+      # ---------------------------------------------------------
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: LLMTokenSaver-SideStore-Ready
+          path: build/LLMTokenSaver-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 7
