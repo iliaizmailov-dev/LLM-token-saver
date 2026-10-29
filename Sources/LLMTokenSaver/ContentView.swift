@@ -99,8 +99,7 @@ struct ContentView: View {
             }
 
             .sheet(
-                isPresented:
-                    $isSettingsPresented
+                isPresented: $isSettingsPresented
             ) {
 
                 settingsView
@@ -162,31 +161,17 @@ struct ContentView: View {
         VStack(spacing: 16) {
 
             textEditorCard(
-                title:
-                    "Оригинальный промпт",
-
-                subtitle:
-                    "Введите текст на родном языке",
-
-                text:
-                    $originalPrompt,
-
-                emptyText:
-                    "Например: объясни этот Swift-код..."
+                title: "Оригинальный промпт",
+                subtitle: "Введите текст на родном языке",
+                text: $originalPrompt,
+                emptyText: "Например: объясни этот Swift-код..."
             )
 
             textEditorCard(
-                title:
-                    "English",
-
-                subtitle:
-                    "Английская версия для LLM",
-
-                text:
-                    $englishPrompt,
-
-                emptyText:
-                    "Перевод появится здесь..."
+                title: "English",
+                subtitle: "Английская версия для LLM",
+                text: $englishPrompt,
+                emptyText: "Перевод появится здесь..."
             )
         }
     }
@@ -203,8 +188,7 @@ struct ContentView: View {
 
             HStack(spacing: 10) {
 
-                if isTranslating ||
-                    isSending {
+                if isTranslating || isSending {
 
                     ProgressView()
                         .tint(.white)
@@ -276,20 +260,15 @@ struct ContentView: View {
 
     private var buttonDisabled: Bool {
 
-        if isTranslating ||
-            isSending {
-
+        if isTranslating || isSending {
             return true
         }
 
         if englishPrompt.isEmpty {
-
-            return trimmedOriginalPrompt
-                .isEmpty
+            return trimmedOriginalPrompt.isEmpty
         }
 
-        return trimmedEnglishPrompt
-            .isEmpty
+        return trimmedEnglishPrompt.isEmpty
     }
 
     // MARK: - Response Section
@@ -333,5 +312,579 @@ struct ContentView: View {
 
                 Label(
                     "Новый промпт",
-                    systemImage:
-                        "plus
+                    systemImage: "plus.bubble"
+                )
+
+                .frame(
+                    maxWidth: .infinity
+                )
+
+                .padding(
+                    .vertical,
+                    12
+                )
+            }
+
+            .buttonStyle(
+                .bordered
+            )
+        }
+    }
+
+    // MARK: - Progress
+
+    private var progressSection: some View {
+
+        HStack(spacing: 10) {
+
+            ProgressView()
+
+            Text(
+                isSending
+                    ? "Ожидание ответа LLM..."
+                    : "Локальный перевод..."
+            )
+
+            .font(.footnote)
+
+            .foregroundStyle(
+                .secondary
+            )
+        }
+    }
+
+    // MARK: - Settings
+
+    private var settingsView: some View {
+
+        NavigationStack {
+
+            Form {
+
+                Section("OpenAI") {
+
+                    SecureField(
+                        "API Key",
+                        text: $apiKey
+                    )
+
+                    .textInputAutocapitalization(
+                        .never
+                    )
+
+                    .autocorrectionDisabled()
+
+                    TextField(
+                        "Model",
+                        text: $selectedModel
+                    )
+
+                    .textInputAutocapitalization(
+                        .never
+                    )
+
+                    .autocorrectionDisabled()
+                }
+
+                Section {
+
+                    Text(
+                        "API Key хранится локально " +
+                        "в Keychain этого устройства."
+                    )
+
+                    .font(.footnote)
+
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+            }
+
+            .navigationTitle(
+                "Настройки"
+            )
+
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+
+            .toolbar {
+
+                ToolbarItem(
+                    placement: .confirmationAction
+                ) {
+
+                    Button(
+                        "Готово"
+                    ) {
+
+                        saveAPIKey()
+
+                        isSettingsPresented = false
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Text Editor Card
+
+    private func textEditorCard(
+        title: String,
+        subtitle: String,
+        text: Binding<String>,
+        emptyText: String
+    ) -> some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: 8
+        ) {
+
+            Text(title)
+                .font(.headline)
+
+            Text(subtitle)
+                .font(.caption)
+
+                .foregroundStyle(
+                    .secondary
+                )
+
+            ZStack(
+                alignment: .topLeading
+            ) {
+
+                if text.wrappedValue.isEmpty {
+
+                    Text(emptyText)
+
+                        .foregroundStyle(
+                            .tertiary
+                        )
+
+                        .padding(
+                            .horizontal,
+                            5
+                        )
+
+                        .padding(
+                            .vertical,
+                            8
+                        )
+
+                        .allowsHitTesting(
+                            false
+                        )
+                }
+
+                TextEditor(
+                    text: text
+                )
+
+                .frame(
+                    minHeight: 130
+                )
+
+                .scrollContentBackground(
+                    .hidden
+                )
+
+                .background(
+                    Color.clear
+                )
+            }
+
+            .padding(8)
+
+            .background(
+                Color.secondary
+                    .opacity(0.08)
+            )
+
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 12,
+                    style: .continuous
+                )
+            )
+        }
+    }
+
+    // MARK: - Read Only Card
+
+    private func readOnlyCard(
+        title: String,
+        text: String
+    ) -> some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: 8
+        ) {
+
+            Text(title)
+                .font(.headline)
+
+            Text(text)
+
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
+
+                .textSelection(
+                    .enabled
+                )
+
+                .padding()
+
+                .background(
+                    Color.secondary
+                        .opacity(0.08)
+                )
+
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: 12,
+                        style: .continuous
+                    )
+                )
+        }
+    }
+
+    // MARK: - Engine Setup
+
+    private func configureEngine() {
+
+        engine.translationHandler = {
+            text,
+            direction in
+
+            let translationTask = Task {
+                @MainActor in
+
+                try await translationService
+                    .requestTranslation(
+                        text: text,
+                        direction: direction
+                    )
+            }
+
+            await Task.yield()
+
+            await MainActor.run {
+
+                requestTranslationSession(
+                    for: direction
+                )
+            }
+
+            return try await translationTask.value
+        }
+    }
+
+    // MARK: - Primary Action
+
+    private func performPrimaryAction() {
+
+        guard !isTranslating,
+              !isSending
+        else {
+            return
+        }
+
+        if englishPrompt.isEmpty {
+
+            translatePrompt()
+
+        } else {
+
+            sendPrompt()
+        }
+    }
+
+    // MARK: - Translate Prompt
+
+    private func translatePrompt() {
+
+        guard !trimmedOriginalPrompt.isEmpty
+        else {
+            return
+        }
+
+        isTranslating = true
+
+        errorMessage = nil
+
+        Task {
+
+            do {
+
+                let translated =
+                    try await engine
+                        .translatePrompt(
+                            originalPrompt
+                        )
+
+                await MainActor.run {
+
+                    englishPrompt =
+                        translated
+
+                    isTranslating =
+                        false
+                }
+
+            } catch {
+
+                await MainActor.run {
+
+                    errorMessage =
+                        error.localizedDescription
+
+                    isTranslating =
+                        false
+                }
+            }
+        }
+    }
+
+    // MARK: - Send Prompt
+
+    private func sendPrompt() {
+
+        guard !trimmedEnglishPrompt.isEmpty
+        else {
+            return
+        }
+
+        let cleanAPIKey =
+            apiKey.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        guard !cleanAPIKey.isEmpty
+        else {
+
+            errorMessage =
+                "Сначала укажите OpenAI API Key в настройках."
+
+            isSettingsPresented = true
+
+            return
+        }
+
+        let cleanModel =
+            selectedModel.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        guard !cleanModel.isEmpty
+        else {
+
+            errorMessage =
+                "Укажите модель OpenAI в настройках."
+
+            isSettingsPresented = true
+
+            return
+        }
+
+        isSending = true
+
+        errorMessage = nil
+
+        Task {
+
+            do {
+
+                let response =
+                    try await engine
+                        .sendPrompt(
+                            originalPrompt:
+                                originalPrompt,
+                            englishPrompt:
+                                englishPrompt,
+                            apiKey:
+                                cleanAPIKey,
+                            model:
+                                cleanModel
+                        )
+
+                await MainActor.run {
+
+                    englishResponse =
+                        response.english
+
+                    nativeResponse =
+                        response.translated
+
+                    isSending =
+                        false
+                }
+
+            } catch {
+
+                await MainActor.run {
+
+                    errorMessage =
+                        error.localizedDescription
+
+                    isSending =
+                        false
+                }
+            }
+        }
+    }
+
+    // MARK: - Apple Translation Session
+
+    private func performSystemTranslation(
+        using session: TranslationSession
+    ) async {
+
+        await Task { @MainActor in
+
+            guard let request =
+                translationService.pendingRequest
+            else {
+                return
+            }
+
+            do {
+
+                let response =
+                    try await session.translate(
+                        request.text
+                    )
+
+                translationService.complete(
+                    with: response.targetText
+                )
+
+            } catch {
+
+                translationService.fail(
+                    with: error
+                )
+            }
+        }.value
+    }
+
+    // MARK: - Translation Configuration
+
+    @MainActor
+    private func requestTranslationSession(
+        for direction: TranslationDirection
+    ) {
+
+        if activeTranslationDirection == direction,
+           translationConfiguration != nil {
+
+            translationConfiguration?
+                .invalidate()
+
+            return
+        }
+
+        activeTranslationDirection =
+            direction
+
+        let english =
+            Locale.Language(
+                identifier: "en"
+            )
+
+        switch direction {
+
+        case .toEnglish:
+
+            translationConfiguration =
+                TranslationSession
+                    .Configuration(
+                        source: nil,
+                        target: english
+                    )
+
+        case .fromEnglish:
+
+            translationConfiguration =
+                TranslationSession
+                    .Configuration(
+                        source: english,
+                        target: nil
+                    )
+        }
+    }
+
+    // MARK: - Load API Key
+
+    private func loadSavedAPIKey() {
+
+        do {
+
+            if let savedAPIKey =
+                try KeychainService
+                    .loadAPIKey() {
+
+                apiKey = savedAPIKey
+            }
+
+        } catch {
+
+            errorMessage =
+                error.localizedDescription
+        }
+    }
+
+    // MARK: - Save API Key
+
+    private func saveAPIKey() {
+
+        let cleanKey =
+            apiKey.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        do {
+
+            if cleanKey.isEmpty {
+
+                try KeychainService
+                    .deleteAPIKey()
+
+            } else {
+
+                try KeychainService
+                    .saveAPIKey(
+                        cleanKey
+                    )
+
+                apiKey = cleanKey
+            }
+
+        } catch {
+
+            errorMessage =
+                error.localizedDescription
+        }
+    }
+
+    // MARK: - Reset
+
+    private func startNewPrompt() {
+
+        originalPrompt = ""
+        englishPrompt = ""
+
+        nativeResponse = ""
+        englishResponse = ""
+
+        errorMessage = nil
+
+        isTranslating = false
+        isSending = false
+    }
+}
