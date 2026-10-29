@@ -18,6 +18,7 @@ struct ContentView: View {
     @State private var selectedModel = "gpt-4o-mini"
 
     @State private var isSettingsPresented = false
+
     @State private var isTranslating = false
     @State private var isSending = false
 
@@ -28,6 +29,8 @@ struct ContentView: View {
 
     @State private var activeTranslationDirection:
         TranslationDirection?
+
+    // MARK: - Computed Values
 
     private var trimmedOriginalPrompt: String {
         originalPrompt.trimmingCharacters(
@@ -40,6 +43,8 @@ struct ContentView: View {
             in: .whitespacesAndNewlines
         )
     }
+
+    // MARK: - Body
 
     var body: some View {
 
@@ -65,7 +70,10 @@ struct ContentView: View {
                 }
                 .padding()
             }
-            .navigationTitle("LLM Token Saver")
+
+            .navigationTitle(
+                "LLM Token Saver"
+            )
 
             .toolbar {
 
@@ -74,12 +82,16 @@ struct ContentView: View {
                 ) {
 
                     Button {
+
                         isSettingsPresented = true
+
                     } label: {
+
                         Image(
                             systemName: "gearshape"
                         )
                     }
+
                     .accessibilityLabel(
                         "Настройки"
                     )
@@ -90,6 +102,7 @@ struct ContentView: View {
                 isPresented:
                     $isSettingsPresented
             ) {
+
                 settingsView
             }
 
@@ -99,9 +112,9 @@ struct ContentView: View {
                     get: {
                         errorMessage != nil
                     },
-                    set: { value in
+                    set: { newValue in
 
-                        if !value {
+                        if !newValue {
                             errorMessage = nil
                         }
                     }
@@ -112,6 +125,7 @@ struct ContentView: View {
                     "OK",
                     role: .cancel
                 ) {
+
                     errorMessage = nil
                 }
 
@@ -124,7 +138,9 @@ struct ContentView: View {
             }
 
             .task {
+
                 configureEngine()
+
                 loadSavedAPIKey()
             }
 
@@ -139,7 +155,7 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Prompt
+    // MARK: - Prompt Section
 
     private var promptSection: some View {
 
@@ -175,7 +191,7 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Main Button
+    // MARK: - Main Action Button
 
     private var actionButton: some View {
 
@@ -207,7 +223,9 @@ struct ContentView: View {
                 14
             )
 
-            .foregroundStyle(.white)
+            .foregroundStyle(
+                .white
+            )
 
             .background(
                 buttonColor
@@ -274,7 +292,7 @@ struct ContentView: View {
             .isEmpty
     }
 
-    // MARK: - Response
+    // MARK: - Response Section
 
     private var responseSection: some View {
 
@@ -320,8 +338,7 @@ struct ContentView: View {
                 )
 
                 .frame(
-                    maxWidth:
-                        .infinity
+                    maxWidth: .infinity
                 )
 
                 .padding(
@@ -422,7 +439,9 @@ struct ContentView: View {
                         .confirmationAction
                 ) {
 
-                    Button("Готово") {
+                    Button(
+                        "Готово"
+                    ) {
 
                         saveAPIKey()
 
@@ -434,7 +453,7 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Reusable UI
+    // MARK: - Text Editor Card
 
     private func textEditorCard(
         title: String,
@@ -453,6 +472,7 @@ struct ContentView: View {
 
             Text(subtitle)
                 .font(.caption)
+
                 .foregroundStyle(
                     .secondary
                 )
@@ -466,6 +486,7 @@ struct ContentView: View {
                     .isEmpty {
 
                     Text(emptyText)
+
                         .foregroundStyle(
                             .tertiary
                         )
@@ -518,6 +539,8 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Read Only Card
+
     private func readOnlyCard(
         title: String,
         text: String
@@ -536,6 +559,7 @@ struct ContentView: View {
                 .frame(
                     maxWidth:
                         .infinity,
+
                     alignment:
                         .leading
                 )
@@ -568,15 +592,30 @@ struct ContentView: View {
             text,
             direction in
 
-            try await translationService
-                .requestTranslation(
-                    text: text,
-                    direction: direction
+            let translationTask = Task {
+                @MainActor in
+
+                try await translationService
+                    .requestTranslation(
+                        text: text,
+                        direction: direction
+                    )
+            }
+
+            await Task.yield()
+
+            await MainActor.run {
+
+                requestTranslationSession(
+                    for: direction
                 )
+            }
+
+            return try await translationTask.value
         }
     }
 
-    // MARK: - Actions
+    // MARK: - Primary Action
 
     private func performPrimaryAction() {
 
@@ -596,6 +635,8 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Translate Prompt
+
     private func translatePrompt() {
 
         guard !trimmedOriginalPrompt
@@ -605,6 +646,7 @@ struct ContentView: View {
         }
 
         isTranslating = true
+
         errorMessage = nil
 
         Task {
@@ -641,6 +683,8 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Send Prompt
+
     private func sendPrompt() {
 
         guard !trimmedEnglishPrompt
@@ -666,7 +710,25 @@ struct ContentView: View {
             return
         }
 
+        let cleanModel =
+            selectedModel.trimmingCharacters(
+                in:
+                    .whitespacesAndNewlines
+            )
+
+        guard !cleanModel.isEmpty else {
+
+            errorMessage =
+                "Укажите модель OpenAI в настройках."
+
+            isSettingsPresented =
+                true
+
+            return
+        }
+
         isSending = true
+
         errorMessage = nil
 
         Task {
@@ -686,7 +748,7 @@ struct ContentView: View {
                                 cleanAPIKey,
 
                             model:
-                                selectedModel
+                                cleanModel
                         )
 
                 await MainActor.run {
@@ -716,7 +778,7 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Apple Translation
+    // MARK: - Apple Translation Session
 
     @MainActor
     private func performSystemTranslation(
@@ -753,10 +815,23 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Translation Configuration
+
+    @MainActor
     private func requestTranslationSession(
         for direction:
             TranslationDirection
     ) {
+
+        if activeTranslationDirection ==
+            direction,
+           translationConfiguration != nil {
+
+            translationConfiguration?
+                .invalidate()
+
+            return
+        }
 
         activeTranslationDirection =
             direction
@@ -779,32 +854,27 @@ struct ContentView: View {
 
         case .fromEnglish:
 
-            let englishSource =
-                Locale.Language(
-                    identifier: "en"
-                )
-
             translationConfiguration =
                 TranslationSession
                     .Configuration(
-                        source:
-                            englishSource,
+                        source: english,
                         target: nil
                     )
         }
     }
 
-    // MARK: - Keychain
+    // MARK: - Load API Key
 
     private func loadSavedAPIKey() {
 
         do {
 
-            if let saved =
+            if let savedAPIKey =
                 try KeychainService
                     .loadAPIKey() {
 
-                apiKey = saved
+                apiKey =
+                    savedAPIKey
             }
 
         } catch {
@@ -813,6 +883,8 @@ struct ContentView: View {
                 error.localizedDescription
         }
     }
+
+    // MARK: - Save API Key
 
     private func saveAPIKey() {
 
@@ -835,6 +907,9 @@ struct ContentView: View {
                     .saveAPIKey(
                         cleanKey
                     )
+
+                apiKey =
+                    cleanKey
             }
 
         } catch {
@@ -849,11 +924,17 @@ struct ContentView: View {
     private func startNewPrompt() {
 
         originalPrompt = ""
+
         englishPrompt = ""
 
         nativeResponse = ""
+
         englishResponse = ""
 
         errorMessage = nil
+
+        isTranslating = false
+
+        isSending = false
     }
 }
