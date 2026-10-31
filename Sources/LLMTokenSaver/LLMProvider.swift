@@ -2,7 +2,7 @@ import Foundation
 
 enum LLMProvider: String, CaseIterable, Identifiable {
     case openAI
-    case copilot
+    case microsoft365Copilot
 
     var id: String { rawValue }
 
@@ -10,8 +10,8 @@ enum LLMProvider: String, CaseIterable, Identifiable {
         switch self {
         case .openAI:
             return "OpenAI"
-        case .copilot:
-            return "GitHub Copilot"
+        case .microsoft365Copilot:
+            return "Microsoft 365 Copilot"
         }
     }
 
@@ -19,17 +19,17 @@ enum LLMProvider: String, CaseIterable, Identifiable {
         switch self {
         case .openAI:
             return "gpt-4o-mini"
-        case .copilot:
+        case .microsoft365Copilot:
             return "gpt-4o-mini"
         }
     }
 
-    var endpoint: URL {
+    var defaultEndpointURL: URL {
         switch self {
         case .openAI:
             return URL(string: "https://api.openai.com/v1/chat/completions")!
-        case .copilot:
-            return URL(string: "https://api.githubcopilot.com/v1/chat/completions")!
+        case .microsoft365Copilot:
+            return URL(string: "https://graph.microsoft.com")!
         }
     }
 }
