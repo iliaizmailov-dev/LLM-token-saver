@@ -44,10 +44,7 @@ final class ChatEngine: ObservableObject {
             throw ChatEngineError.translationUnavailable
         }
 
-        let payload = MarkdownParser.prepareForTranslation(
-            trimmed
-        )
-
+        let payload = MarkdownParser.prepareForTranslation(trimmed)
         let translated = try await translationHandler(
             payload.textToTranslate,
             .toEnglish
@@ -64,7 +61,8 @@ final class ChatEngine: ObservableObject {
         englishPrompt: String,
         provider: LLMProvider,
         apiKey: String,
-        model: String
+        model: String,
+        endpointOverride: String? = nil
     ) async throws -> PromptResponse {
 
         let cleanEnglishPrompt =
@@ -134,7 +132,8 @@ final class ChatEngine: ObservableObject {
                     provider: provider,
                     apiKey: cleanAPIKey,
                     model: cleanModel,
-                    messages: englishHistory
+                    messages: englishHistory,
+                    endpointOverride: endpointOverride
                 )
 
             let translatedResponse =
@@ -239,12 +238,10 @@ enum ChatEngineError: LocalizedError {
             return "Не указана модель."
 
         case .translationUnavailable:
-            return
-                "Сервис перевода ещё не готов."
+            return "Сервис перевода ещё не готов."
 
         case .threadUnavailable:
-            return
-                "Не удалось создать ветку диалога."
+            return "Не удалось создать ветку диалога."
         }
     }
 }

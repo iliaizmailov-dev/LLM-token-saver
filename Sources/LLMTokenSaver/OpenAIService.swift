@@ -11,7 +11,8 @@ struct OpenAIService {
         provider: LLMProvider,
         apiKey: String,
         model: String,
-        messages: [OpenAIChatMessage]
+        messages: [OpenAIChatMessage],
+        endpointOverride: String? = nil
     ) async throws -> String {
 
         let payload = ChatRequest(
@@ -19,8 +20,16 @@ struct OpenAIService {
             messages: messages
         )
 
+        let endpointURL: URL
+        if let endpointOverride,
+           let url = URL(string: endpointOverride.trimmingCharacters(in: .whitespacesAndNewlines)) {
+            endpointURL = url
+        } else {
+            endpointURL = provider.defaultEndpointURL
+        }
+
         var request = URLRequest(
-            url: provider.endpoint
+            url: endpointURL
         )
 
         request.httpMethod = "POST"
@@ -147,23 +156,16 @@ enum OpenAIServiceError: LocalizedError {
         switch self {
 
         case .invalidResponse:
-            return
-                "API вернул некорректный ответ."
+            return "API вернул некорректный ответ."
 
         case .emptyResponse:
-            return
-                "API вернул пустой ответ."
+            return "API вернул пустой ответ."
 
         case .httpError(let statusCode):
-            return
-                "Ошибка API. HTTP \(statusCode)."
+            return "Ошибка API. HTTP \(statusCode)."
 
-        case .apiError(
-            let statusCode,
-            let message
-        ):
-            return
-                "API \(statusCode): \(message)"
+        case .apiError(let statusCode, let message):
+            return "API \(statusCode): \(message)"
         }
     }
 }

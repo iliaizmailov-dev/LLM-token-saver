@@ -20,8 +20,7 @@ struct ContentView: View {
 
     @ObservedObject var engine: ChatEngine
 
-    @StateObject private var translationService =
-        TranslationService()
+    @StateObject private var translationService = TranslationService()
 
     @State private var originalPrompt = ""
     @State private var englishPrompt = ""
@@ -30,147 +29,84 @@ struct ContentView: View {
     @State private var englishResponse = ""
 
     @State private var openAIApiKey = ""
-    @State private var copilotAPIKey = ""
+    @State private var microsoft365APIKey = ""
+    @State private var microsoft365Endpoint = ""
     @State private var selectedProvider: LLMProvider = .openAI
     @State private var selectedModel = "gpt-4o-mini"
 
     @State private var isSettingsPresented = false
-
     @State private var isTranslating = false
     @State private var isSending = false
-
     @State private var errorMessage: String?
-
-    @State private var translationConfiguration:
-        TranslationSession.Configuration?
-
-    @State private var activeTranslationDirection:
-        TranslationDirection?
+    @State private var translationConfiguration: TranslationSession.Configuration?
+    @State private var activeTranslationDirection: TranslationDirection?
 
     private var trimmedOriginalPrompt: String {
-        originalPrompt.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        )
+        originalPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var trimmedEnglishPrompt: String {
-        englishPrompt.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        )
+        englishPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     var body: some View {
-
         NavigationStack {
-
             ScrollView {
-
                 VStack(spacing: 20) {
-
                     promptSection
-
                     actionButton
 
                     if isTranslating || isSending {
                         progressSection
                     }
 
-                    if !nativeResponse.isEmpty ||
-                        !englishResponse.isEmpty {
-
+                    if !nativeResponse.isEmpty || !englishResponse.isEmpty {
                         responseSection
                     }
                 }
                 .padding()
             }
-
-            .navigationTitle(
-                "LLM Token Saver"
-            )
-
+            .navigationTitle("LLM Token Saver")
             .toolbar {
-
-                ToolbarItem(
-                    placement: .topBarTrailing
-                ) {
-
+                ToolbarItem(placement: .topBarTrailing) {
                     Button {
-
                         isSettingsPresented = true
-
                     } label: {
-
-                        Image(
-                            systemName: "gearshape"
-                        )
+                        Image(systemName: "gearshape")
                     }
-
-                    .accessibilityLabel(
-                        "Настройки"
-                    )
+                    .accessibilityLabel("Настройки")
                 }
             }
-
-            .sheet(
-                isPresented: $isSettingsPresented
-            ) {
-
+            .sheet(isPresented: $isSettingsPresented) {
                 settingsView
             }
-
             .alert(
                 "Ошибка",
                 isPresented: Binding(
-                    get: {
-                        errorMessage != nil
-                    },
+                    get: { errorMessage != nil },
                     set: { newValue in
-
-                        if !newValue {
-                            errorMessage = nil
-                        }
+                        if !newValue { errorMessage = nil }
                     }
                 )
             ) {
-
-                Button(
-                    "OK",
-                    role: .cancel
-                ) {
-
+                Button("OK", role: .cancel) {
                     errorMessage = nil
                 }
-
             } message: {
-
-                Text(
-                    errorMessage ??
-                    "Неизвестная ошибка"
-                )
+                Text(errorMessage ?? "Неизвестная ошибка")
             }
-
             .task {
-
                 configureEngine()
-
                 loadSavedAPIKeys()
             }
-
-            .translationTask(
-                translationConfiguration
-            ) { session in
-
-                await performSystemTranslation(
-                    using: session
-                )
+            .translationTask(translationConfiguration) { session in
+                await performSystemTranslation(using: session)
             }
         }
     }
 
     private var promptSection: some View {
-
         VStack(spacing: 16) {
-
             textEditorCard(
                 title: "Оригинальный промпт",
                 subtitle: "Введите текст на родном языке",
@@ -188,260 +124,125 @@ struct ContentView: View {
     }
 
     private var actionButton: some View {
-
         Button {
-
             performPrimaryAction()
-
         } label: {
-
             HStack(spacing: 10) {
-
                 if isTranslating || isSending {
-
-                    ProgressView()
-                        .tint(.white)
+                    ProgressView().tint(.white)
                 }
-
-                Text(buttonTitle)
-                    .fontWeight(.semibold)
+                Text(buttonTitle).fontWeight(.semibold)
             }
-
-            .frame(
-                maxWidth: .infinity
-            )
-
-            .padding(
-                .vertical,
-                14
-            )
-
-            .foregroundStyle(
-                .white
-            )
-
-            .background(
-                buttonColor
-            )
-
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: 12,
-                    style: .continuous
-                )
-            )
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .foregroundStyle(.white)
+            .background(buttonColor)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
-
-        .disabled(
-            buttonDisabled
-        )
+        .disabled(buttonDisabled)
     }
 
     private var buttonTitle: String {
-
-        if isTranslating {
-            return "Перевод..."
-        }
-
-        if isSending {
-            return "Отправка..."
-        }
-
-        if englishPrompt.isEmpty {
-            return "Перевести промпт"
-        }
-
+        if isTranslating { return "Перевод..." }
+        if isSending { return "Отправка..." }
+        if englishPrompt.isEmpty { return "Перевести промпт" }
         return "Отправить промпт"
     }
 
     private var buttonColor: Color {
-
-        if buttonDisabled {
-            return .gray
-        }
-
-        if englishPrompt.isEmpty {
-            return .blue
-        }
-
+        if buttonDisabled { return .gray }
+        if englishPrompt.isEmpty { return .blue }
         return .green
     }
 
     private var buttonDisabled: Bool {
-
-        if isTranslating || isSending {
-            return true
-        }
-
-        if englishPrompt.isEmpty {
-            return trimmedOriginalPrompt.isEmpty
-        }
-
+        if isTranslating || isSending { return true }
+        if englishPrompt.isEmpty { return trimmedOriginalPrompt.isEmpty }
         return trimmedEnglishPrompt.isEmpty
     }
 
     private var responseSection: some View {
-
         VStack(spacing: 16) {
-
             Divider()
 
             HStack {
-
                 Text("Ответ")
                     .font(.title2)
                     .fontWeight(.bold)
-
                 Spacer()
             }
 
             if !nativeResponse.isEmpty {
-
-                readOnlyCard(
-                    title: "Перевод",
-                    text: nativeResponse
-                )
+                readOnlyCard(title: "Перевод", text: nativeResponse)
             }
 
             if !englishResponse.isEmpty {
-
-                readOnlyCard(
-                    title: "English",
-                    text: englishResponse
-                )
+                readOnlyCard(title: "English", text: englishResponse)
             }
 
             Button {
-
                 startNewPrompt()
-
             } label: {
-
-                Label(
-                    "Новый промпт",
-                    systemImage: "plus.bubble"
-                )
-
-                .frame(
-                    maxWidth: .infinity
-                )
-
-                .padding(
-                    .vertical,
-                    12
-                )
+                Label("Новый промпт", systemImage: "plus.bubble")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
             }
-
-            .buttonStyle(
-                .bordered
-            )
+            .buttonStyle(.bordered)
         }
     }
 
     private var progressSection: some View {
-
         HStack(spacing: 10) {
-
             ProgressView()
-
-            Text(
-                isSending
-                    ? "Ожидание ответа LLM..."
-                    : "Локальный перевод..."
-            )
-
-            .font(.footnote)
-
-            .foregroundStyle(
-                .secondary
-            )
+            Text(isSending ? "Ожидание ответа LLM..." : "Локальный перевод...")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
     }
 
     private var settingsView: some View {
-
         NavigationStack {
-
             Form {
-
                 Section("Провайдер") {
-                    providerToggle(
-                        provider: .openAI,
-                        isOn: selectedProvider == .openAI
-                    )
-                    providerToggle(
-                        provider: .copilot,
-                        isOn: selectedProvider == .copilot
-                    )
+                    providerToggle(provider: .openAI, isOn: selectedProvider == .openAI)
+                    providerToggle(provider: .microsoft365Copilot, isOn: selectedProvider == .microsoft365Copilot)
                 }
 
                 Section("OpenAI") {
+                    SecureField("API Key", text: $openAIApiKey)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
 
-                    SecureField(
-                        "API Key",
-                        text: $openAIApiKey
-                    )
-                    .textInputAutocapitalization(
-                        .never
-                    )
-                    .autocorrectionDisabled()
-
-                    TextField(
-                        "Model",
-                        text: $selectedModel
-                    )
-                    .textInputAutocapitalization(
-                        .never
-                    )
-                    .autocorrectionDisabled()
+                    TextField("Model", text: $selectedModel)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
                 }
 
-                Section("GitHub Copilot") {
+                Section("Microsoft 365 Copilot") {
+                    SecureField("API Key", text: $microsoft365APIKey)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
 
-                    SecureField(
-                        "API Key",
-                        text: $copilotAPIKey
-                    )
-                    .textInputAutocapitalization(
-                        .never
-                    )
-                    .autocorrectionDisabled()
+                    TextField("Endpoint", text: $microsoft365Endpoint)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .placeholder(when: microsoft365Endpoint.isEmpty) {
+                            Text("https://graph.microsoft.com")
+                        }
                 }
 
                 Section {
-
-                    Text(
-                        "API Key хранится локально в Keychain этого устройства."
-                    )
-
-                    .font(.footnote)
-
-                    .foregroundStyle(
-                        .secondary
-                    )
+                    Text("API Key хранится локально в Keychain этого устройства.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
             }
-
-            .navigationTitle(
-                "Настройки"
-            )
-
-            .navigationBarTitleDisplayMode(
-                .inline
-            )
-
+            .navigationTitle("Настройки")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-
-                ToolbarItem(
-                    placement: .confirmationAction
-                ) {
-
-                    Button(
-                        "Готово"
-                    ) {
-
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Готово") {
                         saveAPIKeys()
-
                         isSettingsPresented = false
                     }
                 }
@@ -449,10 +250,7 @@ struct ContentView: View {
         }
     }
 
-    private func providerToggle(
-        provider: LLMProvider,
-        isOn: Bool
-    ) -> some View {
+    private func providerToggle(provider: LLMProvider, isOn: Bool) -> some View {
         Toggle(
             isOn: Binding(
                 get: { isOn },
@@ -476,145 +274,56 @@ struct ContentView: View {
         text: Binding<String>,
         emptyText: String
     ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title).font(.headline)
+            Text(subtitle).font(.caption).foregroundStyle(.secondary)
 
-        VStack(
-            alignment: .leading,
-            spacing: 8
-        ) {
-
-            Text(title)
-                .font(.headline)
-
-            Text(subtitle)
-                .font(.caption)
-
-                .foregroundStyle(
-                    .secondary
-                )
-
-            ZStack(
-                alignment: .topLeading
-            ) {
-
+            ZStack(alignment: .topLeading) {
                 if text.wrappedValue.isEmpty {
-
                     Text(emptyText)
-
-                        .foregroundStyle(
-                            .tertiary
-                        )
-
-                        .padding(
-                            .horizontal,
-                            5
-                        )
-
-                        .padding(
-                            .vertical,
-                            8
-                        )
-
-                        .allowsHitTesting(
-                            false
-                        )
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 8)
+                        .allowsHitTesting(false)
                 }
 
-                TextEditor(
-                    text: text
-                )
-
-                .frame(
-                    minHeight: 130
-                )
-
-                .scrollContentBackground(
-                    .hidden
-                )
-
-                .background(
-                    Color.clear
-                )
+                TextEditor(text: text)
+                    .frame(minHeight: 130)
+                    .scrollContentBackground(.hidden)
+                    .background(Color.clear)
             }
-
             .padding(8)
-
-            .background(
-                Color.secondary
-                    .opacity(0.08)
-            )
-
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: 12,
-                    style: .continuous
-                )
-            )
+            .background(Color.secondary.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 
-    private func readOnlyCard(
-        title: String,
-        text: String
-    ) -> some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: 8
-        ) {
-
-            Text(title)
-                .font(.headline)
-
+    private func readOnlyCard(title: String, text: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title).font(.headline)
             Text(text)
-
-                .frame(
-                    maxWidth: .infinity,
-                    alignment: .leading
-                )
-
-                .textSelection(
-                    .enabled
-                )
-
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
                 .padding()
-
-                .background(
-                    Color.secondary
-                        .opacity(0.08)
-                )
-
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: 12,
-                        style: .continuous
-                    )
-                )
+                .background(Color.secondary.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 
     private func configureEngine() {
-
-        engine.translationHandler = {
-            text,
-            direction in
-
+        engine.translationHandler = { text, direction in
             let translationTask = Task {
                 @MainActor in
-
-                try await translationService
-                    .requestTranslation(
-                        text: text,
-                        direction: direction
-                    )
+                try await translationService.requestTranslation(
+                    text: text,
+                    direction: direction
+                )
             }
 
             await Task.yield()
 
             await MainActor.run {
-
-                requestTranslationSession(
-                    for: direction
-                )
+                requestTranslationSession(for: direction)
             }
 
             return try await translationTask.value
@@ -622,270 +331,160 @@ struct ContentView: View {
     }
 
     private func performPrimaryAction() {
-
-        guard !isTranslating,
-              !isSending
-        else {
-            return
-        }
+        guard !isTranslating, !isSending else { return }
 
         if englishPrompt.isEmpty {
-
             translatePrompt()
-
         } else {
-
             sendPrompt()
         }
     }
 
     private func translatePrompt() {
-
-        guard !trimmedOriginalPrompt.isEmpty
-        else {
-            return
-        }
+        guard !trimmedOriginalPrompt.isEmpty else { return }
 
         isTranslating = true
-
         errorMessage = nil
 
         Task {
-
             do {
-
-                let translated =
-                    try await engine
-                        .translatePrompt(
-                            originalPrompt
-                        )
-
+                let translated = try await engine.translatePrompt(originalPrompt)
                 await MainActor.run {
-
-                    englishPrompt =
-                        translated
-
-                    isTranslating =
-                        false
+                    englishPrompt = translated
+                    isTranslating = false
                 }
-
             } catch {
-
                 await MainActor.run {
-
-                    errorMessage =
-                        error.localizedDescription
-
-                    isTranslating =
-                        false
+                    errorMessage = error.localizedDescription
+                    isTranslating = false
                 }
             }
         }
     }
 
     private func sendPrompt() {
+        guard !trimmedEnglishPrompt.isEmpty else { return }
 
-        guard !trimmedEnglishPrompt.isEmpty
-        else {
-            return
-        }
-
-        let activeAPIKey: String
+        let activeKey: String
         switch selectedProvider {
         case .openAI:
-            activeAPIKey = openAIApiKey
-        case .copilot:
-            activeAPIKey = copilotAPIKey
+            activeKey = openAIApiKey
+        case .microsoft365Copilot:
+            activeKey = microsoft365APIKey
         }
 
-        let cleanAPIKey =
-            activeAPIKey.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
+        let cleanAPIKey = activeKey.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        guard !cleanAPIKey.isEmpty
-        else {
-
-            errorMessage =
-                "Сначала укажите \(selectedProvider.title) API Key в настройках."
-
+        guard !cleanAPIKey.isEmpty else {
+            errorMessage = "Сначала укажите \(selectedProvider.title) API Key в настройках."
             isSettingsPresented = true
-
             return
         }
 
-        let cleanModel =
-            selectedModel.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
-
-        guard !cleanModel.isEmpty
-        else {
-
-            errorMessage =
-                "Укажите модель \(selectedProvider.title) в настройках."
-
+        let cleanModel = selectedModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanModel.isEmpty else {
+            errorMessage = "Укажите модель \(selectedProvider.title) в настройках."
             isSettingsPresented = true
-
             return
+        }
+
+        let endpointOverride: String?
+        switch selectedProvider {
+        case .openAI:
+            endpointOverride = nil
+        case .microsoft365Copilot:
+            let trimmed = microsoft365Endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+            endpointOverride = trimmed.isEmpty ? selectedProvider.defaultEndpointURL.absoluteString : trimmed
         }
 
         isSending = true
-
         errorMessage = nil
 
         Task {
-
             do {
-
-                let response =
-                    try await engine
-                        .sendPrompt(
-                            originalPrompt: originalPrompt,
-                            englishPrompt: englishPrompt,
-                            provider: selectedProvider,
-                            apiKey: cleanAPIKey,
-                            model: cleanModel
-                        )
+                let response = try await engine.sendPrompt(
+                    originalPrompt: originalPrompt,
+                    englishPrompt: englishPrompt,
+                    provider: selectedProvider,
+                    apiKey: cleanAPIKey,
+                    model: cleanModel,
+                    endpointOverride: endpointOverride
+                )
 
                 await MainActor.run {
-
-                    englishResponse =
-                        response.english
-
-                    nativeResponse =
-                        response.translated
-
-                    isSending =
-                        false
+                    englishResponse = response.english
+                    nativeResponse = response.translated
+                    isSending = false
                 }
-
             } catch {
-
                 await MainActor.run {
-
-                    errorMessage =
-                        error.localizedDescription
-
-                    isSending =
-                        false
+                    errorMessage = error.localizedDescription
+                    isSending = false
                 }
             }
         }
     }
 
-    private func performSystemTranslation(
-        using session: TranslationSession
-    ) async {
-
+    private func performSystemTranslation(using session: TranslationSession) async {
         await Task { @MainActor in
-
-            guard let request =
-                translationService.pendingRequest
-            else {
-                return
-            }
+            guard let request = translationService.pendingRequest else { return }
 
             do {
-
-                let response =
-                    try await session.translate(
-                        request.text
-                    )
-
-                translationService.complete(
-                    with: response.targetText
-                )
-
+                let response = try await session.translate(request.text)
+                translationService.complete(with: response.targetText)
             } catch {
-
-                translationService.fail(
-                    with: error
-                )
+                translationService.fail(with: error)
             }
         }.value
     }
 
     @MainActor
-    private func requestTranslationSession(
-        for direction: TranslationDirection
-    ) {
-
-        if activeTranslationDirection == direction,
-           translationConfiguration != nil {
-
-            translationConfiguration?
-                .invalidate()
-
+    private func requestTranslationSession(for direction: TranslationDirection) {
+        if activeTranslationDirection == direction, translationConfiguration != nil {
+            translationConfiguration?.invalidate()
             return
         }
 
-        activeTranslationDirection =
-            direction
+        activeTranslationDirection = direction
 
-        let english =
-            Locale.Language(
-                identifier: "en"
-            )
+        let english = Locale.Language(identifier: "en")
 
         switch direction {
-
         case .toEnglish:
-
-            translationConfiguration =
-                TranslationSession
-                    .Configuration(
-                        source: nil,
-                        target: english
-                    )
-
+            translationConfiguration = TranslationSession.Configuration(
+                source: nil,
+                target: english
+            )
         case .fromEnglish:
-
-            translationConfiguration =
-                TranslationSession
-                    .Configuration(
-                        source: english,
-                        target: nil
-                    )
+            translationConfiguration = TranslationSession.Configuration(
+                source: english,
+                target: nil
+            )
         }
     }
 
     private func loadSavedAPIKeys() {
-
         do {
-            if let savedOpenAIKey =
-                try KeychainService.loadAPIKey(for: .openAI) {
+            if let savedOpenAIKey = try KeychainService.loadAPIKey(for: .openAI) {
                 openAIApiKey = savedOpenAIKey
             }
 
-            if let savedCopilotKey =
-                try KeychainService.loadAPIKey(for: .copilot) {
-                copilotAPIKey = savedCopilotKey
+            if let savedMicrosoftKey = try KeychainService.loadAPIKey(for: .microsoft365Copilot) {
+                microsoft365APIKey = savedMicrosoftKey
             }
 
-            if selectedProvider == .copilot,
-               copilotAPIKey.isEmpty {
-                selectedProvider = .openAI
+            if let savedEndpoint = try? loadMicrosoftEndpoint() {
+                microsoft365Endpoint = savedEndpoint
             }
-
         } catch {
-
-            errorMessage =
-                error.localizedDescription
+            errorMessage = error.localizedDescription
         }
     }
 
     private func saveAPIKeys() {
-
-        let cleanOpenAIKey =
-            openAIApiKey.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
-
-        let cleanCopilotKey =
-            copilotAPIKey.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
+        let cleanOpenAIKey = openAIApiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanMicrosoftKey = microsoft365APIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanEndpoint = microsoft365Endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
 
         do {
             if cleanOpenAIKey.isEmpty {
@@ -894,36 +493,39 @@ struct ContentView: View {
                 try KeychainService.saveAPIKey(cleanOpenAIKey, for: .openAI)
             }
 
-            if cleanCopilotKey.isEmpty {
-                try KeychainService.deleteAPIKey(for: .copilot)
+            if cleanMicrosoftKey.isEmpty {
+                try KeychainService.deleteAPIKey(for: .microsoft365Copilot)
             } else {
-                try KeychainService.saveAPIKey(cleanCopilotKey, for: .copilot)
+                try KeychainService.saveAPIKey(cleanMicrosoftKey, for: .microsoft365Copilot)
+            }
+
+            if cleanEndpoint.isEmpty {
+                UserDefaults.standard.removeObject(forKey: "microsoft365Endpoint")
+            } else {
+                UserDefaults.standard.set(cleanEndpoint, forKey: "microsoft365Endpoint")
             }
 
             openAIApiKey = cleanOpenAIKey
-            copilotAPIKey = cleanCopilotKey
-
-            if selectedProvider == .copilot && cleanCopilotKey.isEmpty {
-                selectedProvider = .openAI
-            }
-
+            microsoft365APIKey = cleanMicrosoftKey
+            microsoft365Endpoint = cleanEndpoint
         } catch {
-
-            errorMessage =
-                error.localizedDescription
+            errorMessage = error.localizedDescription
         }
     }
 
-    private func startNewPrompt() {
+    private func loadMicrosoftEndpoint() throws -> String {
+        if let value = UserDefaults.standard.string(forKey: "microsoft365Endpoint") {
+            return value
+        }
+        return ""
+    }
 
+    private func startNewPrompt() {
         originalPrompt = ""
         englishPrompt = ""
-
         nativeResponse = ""
         englishResponse = ""
-
         errorMessage = nil
-
         isTranslating = false
         isSending = false
     }

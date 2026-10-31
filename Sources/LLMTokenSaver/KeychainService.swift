@@ -6,14 +6,14 @@ enum KeychainService {
     private static let service = "LLMTokenSaver"
 
     private static let openAIAPIKeyAccount = "OpenAIAPIKey"
-    private static let copilotAPIKeyAccount = "GitHubCopilotAPIKey"
+    private static let microsoft365APIKeyAccount = "Microsoft365CopilotAPIKey"
 
     static func saveAPIKey(
         _ apiKey: String,
         for provider: LLMProvider
     ) throws {
 
-        let account = provider == .openAI ? openAIAPIKeyAccount : copilotAPIKeyAccount
+        let account = provider == .openAI ? openAIAPIKeyAccount : microsoft365APIKeyAccount
 
         let data = Data(apiKey.utf8)
 
@@ -40,7 +40,7 @@ enum KeychainService {
         for provider: LLMProvider
     ) throws -> String? {
 
-        let account = provider == .openAI ? openAIAPIKeyAccount : copilotAPIKeyAccount
+        let account = provider == .openAI ? openAIAPIKeyAccount : microsoft365APIKeyAccount
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -51,7 +51,6 @@ enum KeychainService {
         ]
 
         var result: CFTypeRef?
-
         let status = SecItemCopyMatching(query as CFDictionary, &result)
 
         if status == errSecItemNotFound {
@@ -76,7 +75,7 @@ enum KeychainService {
         for provider: LLMProvider
     ) throws {
 
-        let account = provider == .openAI ? openAIAPIKeyAccount : copilotAPIKeyAccount
+        let account = provider == .openAI ? openAIAPIKeyAccount : microsoft365APIKeyAccount
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
