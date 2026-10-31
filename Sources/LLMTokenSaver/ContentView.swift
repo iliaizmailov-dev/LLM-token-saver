@@ -1,6 +1,21 @@
 import SwiftUI
 import Translation
 
+struct CheckboxToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Button {
+            configuration.isOn.toggle()
+        } label: {
+            HStack {
+                Image(systemName: configuration.isOn ? "checkmark.square.fill" : "square")
+                    .foregroundStyle(configuration.isOn ? .accent : .secondary)
+                configuration.label
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 struct ContentView: View {
 
     @ObservedObject var engine: ChatEngine
@@ -14,7 +29,9 @@ struct ContentView: View {
     @State private var nativeResponse = ""
     @State private var englishResponse = ""
 
-    @State private var apiKey = ""
+    @State private var openAIApiKey = ""
+    @State private var copilotAPIKey = ""
+    @State private var selectedProvider: LLMProvider = .openAI
     @State private var selectedModel = "gpt-4o-mini"
 
     @State private var isSettingsPresented = false
@@ -30,8 +47,6 @@ struct ContentView: View {
     @State private var activeTranslationDirection:
         TranslationDirection?
 
-    // MARK: - Computed Values
-
     private var trimmedOriginalPrompt: String {
         originalPrompt.trimmingCharacters(
             in: .whitespacesAndNewlines
@@ -43,8 +58,6 @@ struct ContentView: View {
             in: .whitespacesAndNewlines
         )
     }
-
-    // MARK: - Body
 
     var body: some View {
 
@@ -140,7 +153,7 @@ struct ContentView: View {
 
                 configureEngine()
 
-                loadSavedAPIKey()
+                loadSavedAPIKeys()
             }
 
             .translationTask(
@@ -153,8 +166,6 @@ struct ContentView: View {
             }
         }
     }
-
-    // MARK: - Prompt Section
 
     private var promptSection: some View {
 
@@ -175,8 +186,6 @@ struct ContentView: View {
             )
         }
     }
-
-    // MARK: - Main Action Button
 
     private var actionButton: some View {
 
@@ -271,8 +280,6 @@ struct ContentView: View {
         return trimmedEnglishPrompt.isEmpty
     }
 
-    // MARK: - Response Section
-
     private var responseSection: some View {
 
         VStack(spacing: 16) {
@@ -331,8 +338,6 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Progress
-
     private var progressSection: some View {
 
         HStack(spacing: 10) {
@@ -353,44 +358,60 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Settings
-
     private var settingsView: some View {
 
         NavigationStack {
 
             Form {
 
+                Section("Провайдер") {
+                    providerToggle(
+                        provider: .openAI,
+                        isOn: selectedProvider == .openAI
+                    )
+                    providerToggle(
+                        provider: .copilot,
+                        isOn: selectedProvider == .copilot
+                    )
+                }
+
                 Section("OpenAI") {
 
                     SecureField(
                         "API Key",
-                        text: $apiKey
+                        text: $openAIApiKey
                     )
-
                     .textInputAutocapitalization(
                         .never
                     )
-
                     .autocorrectionDisabled()
 
                     TextField(
                         "Model",
                         text: $selectedModel
                     )
-
                     .textInputAutocapitalization(
                         .never
                     )
+                    .autocorrectionDisabled()
+                }
 
+                Section("GitHub Copilot") {
+
+                    SecureField(
+                        "API Key",
+                        text: $copilotAPIKey
+                    )
+                    .textInputAutocapitalization(
+                        .never
+                    )
                     .autocorrectionDisabled()
                 }
 
                 Section {
 
                     Text(
-                        "API Key хранится локально " +
-                        "в Keychain этого устройства."
+                        "API Key хранится локально в Keychain этого устройства."
                     )
 
                     .font(.footnote)
@@ -419,7 +440,7 @@ struct ContentView: View {
                         "Готово"
                     ) {
 
-                        saveAPIKey()
+                        saveAPIKeys()
 
                         isSettingsPresented = false
                     }
@@ -428,7 +449,26 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Text Editor Card
+    private func providerToggle(
+        provider: LLMProvider,
+        isOn: Bool
+    ) -> some View {
+        Toggle(
+            isOn: Binding(
+                get: { isOn },
+                set: { newValue in
+                    if newValue {
+                        selectedProvider = provider
+                    } else if selectedProvider == provider {
+                        selectedProvider = .openAI
+                    }
+                }
+            )
+        ) {
+            Text(provider.title)
+        }
+        .toggleStyle(CheckboxToggleStyle())
+    }
 
     private func textEditorCard(
         title: String,
@@ -512,8 +552,6 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Read Only Card
-
     private func readOnlyCard(
         title: String,
         text: String
@@ -554,8 +592,6 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Engine Setup
-
     private func configureEngine() {
 
         engine.translationHandler = {
@@ -585,8 +621,6 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Primary Action
-
     private func performPrimaryAction() {
 
         guard !isTranslating,
@@ -604,8 +638,6 @@ struct ContentView: View {
             sendPrompt()
         }
     }
-
-    // MARK: - Translate Prompt
 
     private func translatePrompt() {
 
@@ -651,8 +683,6 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Send Prompt
-
     private func sendPrompt() {
 
         guard !trimmedEnglishPrompt.isEmpty
@@ -660,8 +690,16 @@ struct ContentView: View {
             return
         }
 
+        let activeAPIKey: String
+        switch selectedProvider {
+        case .openAI:
+            activeAPIKey = openAIApiKey
+        case .copilot:
+            activeAPIKey = copilotAPIKey
+        }
+
         let cleanAPIKey =
-            apiKey.trimmingCharacters(
+            activeAPIKey.trimmingCharacters(
                 in: .whitespacesAndNewlines
             )
 
@@ -669,7 +707,7 @@ struct ContentView: View {
         else {
 
             errorMessage =
-                "Сначала укажите OpenAI API Key в настройках."
+                "Сначала укажите \(selectedProvider.title) API Key в настройках."
 
             isSettingsPresented = true
 
@@ -685,7 +723,7 @@ struct ContentView: View {
         else {
 
             errorMessage =
-                "Укажите модель OpenAI в настройках."
+                "Укажите модель \(selectedProvider.title) в настройках."
 
             isSettingsPresented = true
 
@@ -703,14 +741,11 @@ struct ContentView: View {
                 let response =
                     try await engine
                         .sendPrompt(
-                            originalPrompt:
-                                originalPrompt,
-                            englishPrompt:
-                                englishPrompt,
-                            apiKey:
-                                cleanAPIKey,
-                            model:
-                                cleanModel
+                            originalPrompt: originalPrompt,
+                            englishPrompt: englishPrompt,
+                            provider: selectedProvider,
+                            apiKey: cleanAPIKey,
+                            model: cleanModel
                         )
 
                 await MainActor.run {
@@ -738,8 +773,6 @@ struct ContentView: View {
             }
         }
     }
-
-    // MARK: - Apple Translation Session
 
     private func performSystemTranslation(
         using session: TranslationSession
@@ -772,8 +805,6 @@ struct ContentView: View {
             }
         }.value
     }
-
-    // MARK: - Translation Configuration
 
     @MainActor
     private func requestTranslationSession(
@@ -819,17 +850,22 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Load API Key
-
-    private func loadSavedAPIKey() {
+    private func loadSavedAPIKeys() {
 
         do {
+            if let savedOpenAIKey =
+                try KeychainService.loadAPIKey(for: .openAI) {
+                openAIApiKey = savedOpenAIKey
+            }
 
-            if let savedAPIKey =
-                try KeychainService
-                    .loadAPIKey() {
+            if let savedCopilotKey =
+                try KeychainService.loadAPIKey(for: .copilot) {
+                copilotAPIKey = savedCopilotKey
+            }
 
-                apiKey = savedAPIKey
+            if selectedProvider == .copilot,
+               copilotAPIKey.isEmpty {
+                selectedProvider = .openAI
             }
 
         } catch {
@@ -839,30 +875,36 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Save API Key
+    private func saveAPIKeys() {
 
-    private func saveAPIKey() {
+        let cleanOpenAIKey =
+            openAIApiKey.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
 
-        let cleanKey =
-            apiKey.trimmingCharacters(
+        let cleanCopilotKey =
+            copilotAPIKey.trimmingCharacters(
                 in: .whitespacesAndNewlines
             )
 
         do {
-
-            if cleanKey.isEmpty {
-
-                try KeychainService
-                    .deleteAPIKey()
-
+            if cleanOpenAIKey.isEmpty {
+                try KeychainService.deleteAPIKey(for: .openAI)
             } else {
+                try KeychainService.saveAPIKey(cleanOpenAIKey, for: .openAI)
+            }
 
-                try KeychainService
-                    .saveAPIKey(
-                        cleanKey
-                    )
+            if cleanCopilotKey.isEmpty {
+                try KeychainService.deleteAPIKey(for: .copilot)
+            } else {
+                try KeychainService.saveAPIKey(cleanCopilotKey, for: .copilot)
+            }
 
-                apiKey = cleanKey
+            openAIApiKey = cleanOpenAIKey
+            copilotAPIKey = cleanCopilotKey
+
+            if selectedProvider == .copilot && cleanCopilotKey.isEmpty {
+                selectedProvider = .openAI
             }
 
         } catch {
@@ -871,8 +913,6 @@ struct ContentView: View {
                 error.localizedDescription
         }
     }
-
-    // MARK: - Reset
 
     private func startNewPrompt() {
 

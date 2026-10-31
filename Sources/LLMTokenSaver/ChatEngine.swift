@@ -62,6 +62,7 @@ final class ChatEngine: ObservableObject {
     func sendPrompt(
         originalPrompt: String,
         englishPrompt: String,
+        provider: LLMProvider,
         apiKey: String,
         model: String
     ) async throws -> PromptResponse {
@@ -81,7 +82,7 @@ final class ChatEngine: ObservableObject {
             )
 
         guard !cleanAPIKey.isEmpty else {
-            throw ChatEngineError.missingAPIKey
+            throw ChatEngineError.missingAPIKey(provider: provider)
         }
 
         let cleanModel =
@@ -122,9 +123,7 @@ final class ChatEngine: ObservableObject {
         let englishHistory =
             threads[threadIndex].messages.map {
                 OpenAIChatMessage(
-                    role: $0.isUser
-                        ? "user"
-                        : "assistant",
+                    role: $0.isUser ? "user" : "assistant",
                     content: $0.englishContextText
                 )
             }
@@ -132,6 +131,7 @@ final class ChatEngine: ObservableObject {
         do {
             let englishResponse =
                 try await openAIService.sendChat(
+                    provider: provider,
                     apiKey: cleanAPIKey,
                     model: cleanModel,
                     messages: englishHistory
@@ -221,7 +221,7 @@ struct PromptResponse {
 enum ChatEngineError: LocalizedError {
 
     case emptyPrompt
-    case missingAPIKey
+    case missingAPIKey(provider: LLMProvider)
     case missingModel
     case translationUnavailable
     case threadUnavailable
@@ -232,8 +232,8 @@ enum ChatEngineError: LocalizedError {
         case .emptyPrompt:
             return "Промпт пуст."
 
-        case .missingAPIKey:
-            return "Не указан OpenAI API Key."
+        case .missingAPIKey(let provider):
+            return "Не указан \(provider.title) API Key."
 
         case .missingModel:
             return "Не указана модель."

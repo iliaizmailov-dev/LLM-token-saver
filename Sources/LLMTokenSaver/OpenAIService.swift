@@ -7,12 +7,8 @@ struct OpenAIChatMessage: Codable {
 
 struct OpenAIService {
 
-    private let endpoint = URL(
-        string:
-            "https://api.openai.com/v1/chat/completions"
-    )!
-
     func sendChat(
+        provider: LLMProvider,
         apiKey: String,
         model: String,
         messages: [OpenAIChatMessage]
@@ -24,7 +20,7 @@ struct OpenAIService {
         )
 
         var request = URLRequest(
-            url: endpoint
+            url: provider.endpoint
         )
 
         request.httpMethod = "POST"
@@ -60,8 +56,7 @@ struct OpenAIService {
         else {
             throw parseAPIError(
                 data: data,
-                statusCode:
-                    httpResponse.statusCode
+                statusCode: httpResponse.statusCode
             )
         }
 
@@ -112,14 +107,10 @@ struct OpenAIService {
     }
 }
 
-// MARK: - Request
-
 private struct ChatRequest: Encodable {
     let model: String
     let messages: [OpenAIChatMessage]
 }
-
-// MARK: - Response
 
 private struct ChatResponse: Decodable {
     let choices: [Choice]
@@ -133,8 +124,6 @@ private struct AssistantMessage: Decodable {
     let content: String?
 }
 
-// MARK: - API Error
-
 private struct APIErrorResponse: Decodable {
     let error: APIErrorBody
 }
@@ -143,14 +132,11 @@ private struct APIErrorBody: Decodable {
     let message: String
 }
 
-// MARK: - Errors
-
 enum OpenAIServiceError: LocalizedError {
 
     case invalidResponse
     case emptyResponse
     case httpError(Int)
-
     case apiError(
         statusCode: Int,
         message: String
@@ -162,22 +148,22 @@ enum OpenAIServiceError: LocalizedError {
 
         case .invalidResponse:
             return
-                "OpenAI вернул некорректный ответ."
+                "API вернул некорректный ответ."
 
         case .emptyResponse:
             return
-                "OpenAI вернул пустой ответ."
+                "API вернул пустой ответ."
 
         case .httpError(let statusCode):
             return
-                "Ошибка OpenAI API. HTTP \(statusCode)."
+                "Ошибка API. HTTP \(statusCode)."
 
         case .apiError(
             let statusCode,
             let message
         ):
             return
-                "OpenAI API \(statusCode): \(message)"
+                "API \(statusCode): \(message)"
         }
     }
 }
